@@ -1,0 +1,641 @@
+---
+title: "Analysis of NBA Salary Prediction"
+author: "Amogh Singh"
+Date: 05/03/2022
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    number_sections: false
+    df_print: paged
+    code_download: true
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo=TRUE, error=FALSE)
+options(dplyr.summarise.inform = FALSE)
+```
+
+
+# Project Report {.tabset}
+
+## Abstract
+In Sports Analytics, there has been evergoing research on whether the market price of a Player is overpriced or not. Various attributes factor this analysis like Age, Position, games/minutes played,  player efficiency rating etc. This project aims to explore the dataset of NBA players based on salary and their season statistics for the year 2016-2017. The aim of this project is to generate a regression model that can be used to predict player's salary which can help in determining the accuracy of player's salary.
+
+<center>
+![NBA](NBA_2K16.jpg){width=50%}
+</center>
+
+
+## Introduction {.tabset}
+
+Prediction method based on regression model can be defined as: Regression models predict a value of Y variable from the dataset for any other known value or values X variables from the dataset. 
+Prediction of regression model is based on:
+
+* __y-intercept: Dependent variable__
+
+* __x-intercept: Independent variable__
+
+Prediction requires consideration of good attributes which depends on the type of variables considered for generating a model. This is important as the factors might affect the prediction of salary significantly. 
+
+The coefficients in the equation have the relationship between each independent variable and dependent variable. While this is true, also entering values for independent variables into the equation for predicting mean value is achievable for dependent variable.
+
+This is needed for generating unbiased predictions. 
+Getting predictions precise is done when the observed values cluster are close to the predicted values. For solving this issue we can consider hypothesis 
+
+NBA dataset is a good example for solving the task on prediction as it provides relevant quantitative variables like Age, PER, FPG, G, TS, AST and also some qualitative variables like Pos, Tm etc.
+
+The dataset will be statistically checked to determine if assumptions are met to determine if Points Scored(PPG) is a factor that affects the prediction significantly i.e study will be needed to test whether the mean (PPG) differs and is a factor that is affecting the salary significantly. 
+
+All statistical analyses will be performed using R (software version 4.1.2).
+
+### Hypotheses
+**Null Hypothesis (H0):**Mean PPG has no impact on salary 
+$$ H_0: \mu_1 = \mu_1 = \mu_3 $$
+**Alternative hypothesis (Ha):** Atleast some difference in Mean PPG impact salary
+$$ H_A: Some~ \mu~ is \ne  $$
+
+## Design/Methods {.tabset}
+
+* __The approach for designing our model will be based on our dataset and the variables that we choose.__ 
+
+* __The objective of our study is to build a regression model and evaluate it based on our NBA dataset variables and player's season_stats dataset.__
+
+* __Designing the method for prediction analysis requires selection of variables based on their correlation strength with the dependent variable.__ 
+
+### Required packages
+
+* __Following are the packages required with their use:__
+
+  * __tidyverse__ = Allows for data manipulation and works in harmony with other packages as well
+
+  * __plotly__ = graphical representation in r
+
+  * __rstatix__ = performing statistical tests
+
+  * __data.table__ = Dataframe Enhancement Tool
+
+  * __corrplot__ = Generation of Correlation plots
+
+  * __PerformanceAnalytics__ = Performance and Prediction Analytics Package
+
+  * __GGally__ = A ggplot2 extension
+
+install.packages("rsconnect")
+
+```{r echo=FALSE, warning=FALSE, message = FALSE}
+#LOADING PACKAGES
+library(data.table) #Enhanced dataframe
+library(corrplot)   #For plotting correlation plot
+library(GGally)     #Alternative Package(An Extension) for ggplot2
+library(tidyverse)  #Package that we can use for data analysis
+library(PerformanceAnalytics) # Package for Performance, Prediction Analysis
+library(plotly) #For improving Graphics on plots
+library(rstatix) #Package for performing statistical tests
+```
+
+### Data Preparation
+
+__Plotting First DataSet__
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Dataset is read
+##First dataset
+season_salary <- 
+  read.csv("NBA_season1718_salary.csv")
+season_salary
+
+df <-
+  read.csv("salary_regression.csv")
+```
+
+__Plotting Second Dataset__
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+##Second dataset
+player_stats <- read.csv("Seasons_Stats.csv")
+
+player_stats
+```
+
+### Data Component {.tabset}
+
+* **Column "Pos":** Position at which the player is assigned or plays at.
+* **Column "PTS":** Points scored by the player
+* **Column "Tm":** Name of Team played by the player for
+* **Column "G":** No. of Games played by the player
+* **Column "MP":** Minutes played by the player
+* **Column "PER":** Performance Efficiency Rate for the player
+* **Column "AST":** Assists made by the player
+* **Column "TRB":** Total Rebounds by the Player
+* **Column "TOV":** Turnovers made by the player
+* **Column "BLK":** Block made by the player
+* **Column "STL":** Steals made by the player
+
+__Added Columns__
+
+* **Column "PPG":** Points scored by the player per Game
+* **Column "MPG":** Minutes played by the player per Game
+* **Column "APG":** Assists made by the player per Game
+* **Column "RPG":** Rebounds Percentage per Game
+* **Column "TOPG":** Turnover Percentage per Game
+* **Column "BPG":** Block Percentage per Game
+* **Column "SPG":** Steal Percentage per Game
+
+__Obtaining the types of Data available in season_salary dataset__.
+
+This dataset contains 573 rows for columns of X(player_id), Player(Name), Team(Tm) and Season Salary(Season17_18).
+
+```{r echo=FALSE}
+#displaying datatypes of variables
+#datatypes for dataset 1
+str(season_salary)
+```
+
+__Obtaining the types of Data available in player_stats dataset__.
+
+This dataset contains 24691 rows for 53 columns with major features being, Position(Pos), Age, Games Played(G), Points Scored(Pts), Minutes Played(MP) etc.
+
+```{r echo=FALSE}
+#datatypes for dataset 2
+str(player_stats)
+```
+
+### Data Cleaning
+
+__The filteration technique was used to obtain a dataset for player's stats based on the year: 2016__
+
+__There was a need to mutate features like MPG, PPG, APG etc. to perform regression analysis based on per Game.__
+
+__Filtered data can be viewed here as:__
+
+
+```{r echo=FALSE}
+#Filtering dataset for receving datapoints for the year: 2016.
+#Selecting relevant variables like Year, G, PER, FG, PTS etc.
+#Mutating columns named MPG, RPG, PPG, APG, TOPG, BPG, SPG for further analysis
+filtered_2016 <- 
+  player_stats %>% filter(Year == 2016) %>% 
+  select(Year:G, MP, PER, FG:PTS) %>% 
+  distinct(Player, .keep_all = TRUE) %>% 
+  mutate(MPG = MP/G, PPG = PTS/G, APG = AST/G, 
+         RPG = TRB/G, TOPG = TOV/G, BPG = BLK/G, 
+        SPG = STL/G)
+filtered_2016
+```
+
+### Merging Data
+
+__Our merged data betwen filtered_2016 dataset and season_salary dataset can be viewed here.__
+
+```{r echo=FALSE}
+# Performing full join using merge function for Joining filtered_2016 dataset and season_salary dataset based on common variable "Player".
+salary_new <- merge(filtered_2016, season_salary, by.x = "Player", by.y = "Player")
+# Renaming a column for salary
+names(salary_new)[40] <- "filter_sal"
+#Deleting unwanted column
+salary_new <- salary_new[-39]
+
+salary_new
+```
+
+
+### Correlation check {.tabset}
+
+#### Correlation check No1
+
+__Following plot is for checking correlation__
+
+```{r echo=FALSE}
+#Generating correlation plot for salary with other influential variables
+#to check whether these variables have correlation.
+corrplot(cor(salary_new %>% 
+               select(filter_sal, MPG:SPG, 
+                      Age, PER, contains("%")), 
+             use = "complete.obs"), 
+         method = "number",type = "upper")
+```
+
+
+#### Correlation check No2
+
+__Following plot is for checking correlation__
+
+
+```{r echo=FALSE}
+## Plotting scatterplot matrix for correlation for features with salary variables.
+# Made use of ggpairs function.
+cor_salary_new <- 
+  salary_new %>% 
+  select(filter_sal, PPG, MPG, TOPG, RPG, PER, SPG, APG)
+ggpairs(cor_salary_new)
+```
+
+
+#### Correlation Analysis
+
+__Table shows the correlation value for the following variables__
+
+```{r echo=FALSE}
+#Correlation table
+cor(cor_salary_new)[,"filter_sal"]
+```
+
+Correlation strength is:
+PPG > MPG > TOPG > RPG > PER > SPG > APG
+
+The interesting part of this is that the number of turnovers players make in direct correlation to their salary, and the relationship shows a positive correlation.
+
+The interpretation can be demonstrated in the following way:
+
+The more turnovers they make will result in increased involvement and outcome will be more ball movements in a game.
+
+This way, we can claim that the players who make more turnovers, are directly or at important to their team. This can be expressed as "agressiveness". 
+
+This assumption will be used in place of the duration for which player holds/contains ball in possession in a game.
+
+### Data Visualization {.tabset}
+
+#### DataSet plotting
+
+Following plot shows the Boxplot distribution of Points scored per game. We can see multiple outliers in this graph. This graph display median value as 8. And, the outliers are accumulated near the range 25-30.
+
+```{r echo=FALSE}
+ggplot(df,
+       aes(x=PPG)) +
+  geom_boxplot(fill="blue",
+               outlier.color = "#F56600", outlier.size = 3.0)
+```
+
+#### Interactive Plot
+
+```{r echo= FALSE, warning = FALSE, message = FALSE}
+#Generation of Interactive plot for plotting influence of salary received by the player over points scored per game.
+#plotly function is used
+#hoverinfo argument provides useful technique in generating a plot with dynamic nature. Extremely useful for plotting real-time data.
+names(salary_new)[5] <- "Team"
+plot_ly(data = salary_new, x = ~filter_sal, y = ~PPG, color = ~Team,
+        hoverinfo = "text",
+        text = ~paste("Player: ", Player,
+                      "<br>Salary: ", format(filter_sal, big.mark = ","),"$",
+                      "<br>PPG: ", round(PPG, digits = 3),
+                      "<br>Team: ", Team)) %>% 
+  layout(
+    title = "Salary vs Point Per Game",
+    xaxis = list(title = "Player's Salary in USD"),
+    yaxis = list(title = "Point per Game for Player")
+  )
+```
+
+
+When hovered over the highest valued data, we receive the following information for the data point.
+
+* The most paid player with $34,682,550 is
+  * Stephen Curry
+  * Scores 30.063 PPG
+  * Plays for Team: Golden State Warriors
+
+#### Simple Linear Regression Model {.tabset}
+
+##### Scatter plot with regression line
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+#Plotting scatterplot of regression Model for salary variable on Points Scored per Game to see variance in the graph
+salary_new %>% 
+  ggplot(aes(x = filter_sal, y = PPG)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  labs(x= "Salary", y="PPG")
+```
+
+## Analysis {.tabset}
+
+### Regression Analysis {.tabset}
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+#Fitting a multiple linear regression model by selecting all variables between MPG and SPG.
+salary_regression <- 
+  salary_new %>% select(filter_sal, MPG:SPG)
+lm(filter_sal~., data=salary_regression)
+```
+
+* __Statistical Insights__
+  * Salary rises by $998,724 per year due to the effect of Points Per Game by Player
+  * More Assist Per Game also results in increase in Salary 
+
+#### Trust Factor on Player(by Coach): Depends on Number of turnovers they make..
+
+```{r echo=FALSE}
+#For determining the effect of Trust on Turnovers.
+#Obtaining average for MPG feature using mean function
+avg.minutes <- mean(salary_regression$MPG)
+#Obtaining average for TOPG feature using mean function
+avg.turnover <- mean(salary_regression$TOPG)
+#Converting categorical variable into factors for Yes and No values
+salary_regression$Trusted <- as.factor(ifelse(salary_regression$MPG >= avg.minutes, "Yes", "No"))
+#Converting categorical variable into factors for Yes and No values
+salary_regression$Agressiveness <- as.factor(ifelse(salary_regression$TOPG >= avg.turnover, "Yes", "No"))
+#Printing first 10 rows of the dataset
+head(salary_regression)
+```
+
+
+#### Prallel Slope Model {.tabset}
+
+##### Scatter plot coloured by how many turnovers they make
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Generating regression plot to determine any difference in salary based on Agressiveness
+salary_regression %>% 
+  ggplot(aes(x = filter_sal, y = PPG, colour = Agressiveness)) + 
+  geom_point() + 
+  geom_smooth(method="lm")
+```
+
+__This proves the Assumption that the player who makes more number of turnovers will get paid higher or will receive increase in Salary.__ 
+
+### Modeling & Model_fit Results {.tabset}
+
+__Finding Salary for an average player is necessary for determining the per salary increase after taking Trusted and Agressiveness factors into consideration.__
+
+__An average player receives the following Salary per Season__
+
+```{r echo=FALSE}
+#Getting average player's salary by finding the mean for all players
+mean_salary <- mean(salary_regression$filter_sal)
+mean_salary
+```
+
+__Here we are generating a Multiple Regression model based on Factors like Trusted and Agressiveness__.
+
+__We can determine the model_fit by obtaining the coefficients of the features__:
+
+```{r echo=FALSE}
+#Fitting a multiple regression model for salary based on Trusted and Agressiveness
+trust_lm <- lm(formula = filter_sal ~ Trusted * Agressiveness, data=salary_regression)
+#Plotting summary table for our regression model
+summary(trust_lm)
+```
+
+__Obtaining Coefficients for the features__.
+
+```{r echo=FALSE}
+# Coefficients Table
+coef(trust_lm)
+```
+
+* __Results__
+
+  * There is a direct correlation based on trust and salary increase.
+
+  * This leads to more play time allowed by coach and increase in probability to score more Points per Game(PPG).
+
+  * The salary will increase by __$311,416__.
+
+
+### Analysis & conclusion
+
+#### Prediction Function
+
+Let's try to predict salary for the Most Valuable Player for the year 2016. The Professional Basketballer "Russel Westbrook" played for the team Oklahoma City Thunder and has a sensational season both in Regular and Playoffs Season as well.
+
+<center>
+![RB](Russel_pic.png){width=50%}
+</center>
+
+The statistics for his performance was referenced by the website [Basketball Reference: Russel Westbrook](https://www.basketball-reference.com/players/w/westbru01/gamelog/2017).
+
+Russel Westbrook's Statistics for the year was:
+
+* __Points per Game (PPG): 31.6__
+
+* __Minutes played per Game (MPG): 34.6__
+
+* __Turnovers per Game (TOPG): 5.4__
+
+
+
+#### Conclusion
+
+```{r echo=FALSE}
+#Building a prediction function for predicting value based on PPG, MPG, TOPG.
+# Printing output value for our function
+salary_prediction <- function(m, point, minutes, turn_over){
+  pre_new <- predict(m, data.frame(PPG = point, MPG = minutes, TOPG = turn_over))
+  msg <- paste("PPG:", point, ",MPG:", minutes, ",TOPG:", turn_over, " ==> Expected Salary for player: $", format(round(pre_new), big.mark = ","), sep = "")
+  print(msg)
+}
+```
+
+__Based on the stats for Russel Westbrook, we generate a prediction_fit model and compute the Prediction Salary__.
+
+```{r echo=FALSE}
+# Fitting values for obtaining output
+model <- lm(formula = filter_sal ~ PPG + MPG + TOPG, data = salary_regression)
+salary_prediction(model, 31.6, 34.6, 5.4)
+```
+
+* __According to my prediction model, he will get $25,707,363 next season.__
+
+* __The Official Salary Russel Westbrook received in his next season was: $28,530,608.__
+
+* This resulted with a 93 percent accuracy for our prediction model.
+
+
+## Summary
+
+Our Assessment Study of this Dataset provided many deep insights about the dataset. 
+Based on our study:
+
+* __We were able to clean the data and remove null values or irrelevant variables from the data__.
+* __We were able to Mutate columns for two datasets which provided us with a better dataset to pursue our study on__.
+* __We were able to check different types of datatypes present in our dataset__.
+* __We figured out how many variables are quantitative variables and how many variables are categorical variables__. 
+* __Based on quantitative variables, we were able to perform Exploratory Data Analysis using histogram plot, scatterplot  and obtain deeper insights of our data__. 
+* __Based on categorical variables we were able to split our datasets on levels using factors variables in variables like Aggressiveness, and Trusted etc__.
+* __We were able to  determine influential variables in our data__.
+* __We were able to determine a trend on how higher played players(players with higher salaries) tend to score more points per Game__.
+* __We were able to determine correlation between variables and how they impact the player's salary__.
+* __Through Hypothesis Testing, We were able to prove how highest correlated variable PPG has a significant impact on player's Salary and leads to increase in salary__.
+* __Through model fitting, we successfully achieved the task of generating prediction based on highly influential variables__.  
+* __We were able to achieve an outstanding accuracy rate of 93 percent using this model__.
+* __We also were able to answer the assumptions of how a Coach's trust factor for a player increases Points scored per Game by a player and is able to generate more turnovers during the game__.
+* __These assumptions also provided us with a new trend on determining significant impact (increase) in player's Salary__.
+* Finally for checking the working of our prediction model, we Performed prediction for the Most Valuable Player for the year 2016: __Russel Wetbrook__.
+
+
+
+## References
+
+[Github.com]
+(https://github.com/rstudio/flexdashboard)
+
+
+[RStudio Website]
+(https://shiny.rstudio.com/gallery/)
+
+[LAB files and Homework files- STAT-6020]
+(https://clemson.app.box.com/s/ufxtp6yjv6ov8js5g3djmd7zwgxvd6ed)
+
+[Kaggle.com]
+(https://www.kaggle.com/datasets/koki25ando/salary?select=NBA_season1718_salary.csv)
+
+[Basketball Reference: Russel Westbrook]
+(https://www.basketball-reference.com/players/w/westbru01/gamelog/2017)
+
+[Medium.com]
+(https://towardsdatascience.com/predicting-housing-prices-with-r-c9ec0821328d)
+
+[Rpubs.com]
+(https://rpubs.com/ishantnayer/234221)
+
+
+## Personal Information
+
+### Amogh Singh
+
+I am a Graduate Student at Clemson University perusing his Master’s degree in Computer Science. I have completed Bachelor's in Computer Engineering from Mumbai, India and have developed deep interest in Data Visualization after my Internship on creating dashboards using Streamlit package in Python. This was one of the key reasons for completing the course on Statistical Computing in R which helped me in learning EDA and Visualization along with basics of Hypothesis testing in R. 
+
+In the last years, I have learned working with datasets with quantitative and qualitative variables. However, this project gave me insights on prediction modelling and the capability it demonstrates in making the analysis in bettering perspective over the field of research.
+
+<center>
+![Profile](Amogh_pic.jpeg){width=50%}
+</center>
+
+## Appendix
+
+```{r echo=TRUE, results='hide', eval=FALSE, warning=FALSE, message=FALSE, collapse=TRUE}
+#LOADING PACKAGES
+library(data.table) #Enhanced dataframe
+library(corrplot)   #For plotting correlation plot
+library(GGally)     #Alternative Package(An Extension) for ggplot2
+library(tidyverse)  #Package that we can use for data analysis
+library(PerformanceAnalytics) # Package for Performance, Prediction Analysis
+library(plotly) #For improving Graphics on plots
+library(rstatix) #Package for performing statistical tests
+
+# Dataset is read
+##First dataset
+season_salary <- 
+  read.csv("NBA_season1718_salary.csv")
+season_salary
+
+##Second dataset
+player_stats <- read.csv("Seasons_Stats.csv")
+player_stats
+
+#displaying datatypes of variables
+#datatypes for dataset 1
+str(season_salary)
+
+#datatypes for dataset 2
+str(player_stats)
+
+#Filtering dataset for receving datapoints for the year: 2016.
+#Selecting relevant variables like Year, G, PER, FG, PTS etc.
+#Mutating columns named MPG, RPG, PPG, APG, TOPG, BPG, SPG for further analysis
+filtered_2016 <- 
+  player_stats %>% filter(Year == 2016) %>% 
+  select(Year:G, MP, PER, FG:PTS) %>% 
+  distinct(Player, .keep_all = TRUE) %>% 
+  mutate(MPG = MP/G, PPG = PTS/G, APG = AST/G, 
+         RPG = TRB/G, TOPG = TOV/G, BPG = BLK/G, 
+        SPG = STL/G)
+
+# Performing full join using merge function for Joining filtered_2016 dataset and season_salary dataset based on common variable "Player".
+salary_new <- merge(filtered_2016, season_salary, by.x = "Player", by.y = "Player")
+# Renaming a column for salary
+names(salary_new)[40] <- "filter_sal"
+#Deleting unwanted column
+salary_new <- salary_new[-39]
+
+#Generating correlation plot for salary with other influential variables
+#to check whether these variables have correlation.
+corrplot(cor(salary_new %>% 
+               select(filter_sal, MPG:SPG, 
+                      Age, PER, contains("%")), 
+             use = "complete.obs"), 
+         method = "number",type = "upper")
+
+## Plotting scatterplot matrix for correlation for features with salary variables.
+# Made use of ggpairs function.
+cor_salary_new <- 
+  salary_new %>% 
+  select(filter_sal, PPG, MPG, TOPG, RPG, PER, SPG, APG)
+ggpairs(cor_salary_new)
+
+#Correlation table
+cor(cor_salary_new)[,"filter_sal"]
+
+#Generation of Interactive plot for plotting influence of salary received by the player over points scored per game.
+#plotly function is used
+#hoverinfo argument provides useful technique in generating a plot with dynamic nature. Extremely useful for plotting real-time data.
+names(salary_new)[5] <- "Team"
+plot_ly(data = salary_new, x = ~filter_sal, y = ~PPG, color = ~Team,
+        hoverinfo = "text",
+        text = ~paste("Player: ", Player,
+                      "<br>Salary: ", format(filter_sal, big.mark = ","),"$",
+                      "<br>PPG: ", round(PPG, digits = 3),
+                      "<br>Team: ", Team)) %>% 
+  layout(
+    title = "Salary vs Point Per Game",
+    xaxis = list(title = "Player's Salary in USD"),
+    yaxis = list(title = "Point per Game for Player")
+  )
+
+#Plotting scatterplot of regression Model for salary variable on Points Scored per Game to see variance in the graph
+salary_new %>% 
+  ggplot(aes(x = filter_sal, y = PPG)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+#For determining the effect of Trust on Turnovers.
+#Obtaining average for MPG feature using mean function
+avg.minutes <- mean(salary_regression$MPG)
+#Obtaining average for TOPG feature using mean function
+avg.turnover <- mean(salary_regression$TOPG)
+#Converting categorical variable into factors for Yes and No values
+salary_regression$Trusted <- as.factor(ifelse(salary_regression$MPG >= avg.minutes, "Yes", "No"))
+#Converting categorical variable into factors for Yes and No values
+salary_regression$Agressiveness <- as.factor(ifelse(salary_regression$TOPG >= avg.turnover, "Yes", "No"))
+#Printing first 10 rows of the dataset
+head(salary_regression)
+
+# Generating regression plot to determine any difference in salary based on Agressiveness
+salary_regression %>% 
+  ggplot(aes(x = filter_sal, y = PPG, colour = Agressiveness)) + 
+  geom_point() + 
+  geom_smooth(method="lm")
+
+#Getting average player's salary by finding the mean for all players
+mean_salary <- mean(salary_regression$filter_sal)
+mean_salary
+
+#Fitting a multiple regression model for salary based on Trusted and Agressiveness
+trust_lm <- lm(formula = filter_sal ~ Trusted * Agressiveness, data=salary_regression)
+#Plotting summary table for our regression model
+summary(trust_lm)
+
+# Coefficients Table
+coef(trust_lm)
+
+#Building a prediction function for predicting value based on PPG, MPG, TOPG.
+# Printing output value for our function
+salary_prediction <- function(m, point, minutes, turn_over){
+  pre_new <- predict(m, data.frame(PPG = point, MPG = minutes, TOPG = turn_over))
+  msg <- paste("PPG:", point, ",MPG:", minutes, ",TOPG:", turn_over, " ==> Expected Salary for player: $", format(round(pre_new), big.mark = ","), sep = "")
+  print(msg)
+}
+
+# Fitting values for obtaining output
+model <- lm(formula = filter_sal ~ PPG + MPG + TOPG, data = salary_regression)
+salary_prediction(model, 31.6, 34.6, 5.4)
+```
+
+## Acknowledgement
+
+* __Clemson University School of Computing__.
+
+* __Prof. Ellen Breazel, Teacher in STAT-6020 Intro to Statistical Computing - Spring 2022 at Clemson University__.
+

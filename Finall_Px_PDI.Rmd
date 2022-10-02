@@ -1,0 +1,392 @@
+---
+title: "Influence of Conditioning Temperature on Pellet Quality"
+author: "Santiago Sasia"
+output:
+  rmdformats::downcute:
+  toc: true
+  toc_depth: 2
+  toc_float: true
+  number_sections: false
+  df_print: paged
+  code_download: true
+---
+
+# Statistical Report {.tabset}
+## Abstract
+
+The objective of this study was to evaluate the effect of 3 conditioning temperatures (75, 80, and 85ºC) on pellet quality. There will be eight replicates per temperature treatment. Thus 24 representative samples will be used from a corn-soybean meal-based diet with 3.42% soybean oil. Pellet quality was analyzed using the tumbler method modified with the addition of 5 hex-nuts. Results showed that increasing conditioning temperature increases Pellet quality.
+
+<center>
+![Pellet](pellet.jpg){width=50%}
+</center>
+
+## Introduction {.tabset}
+
+The most popular heat treatment in poultry feed production is pelleting, a process in which mash feeds are agglomerated into large pellets.
+Pelleting offers several benefits, such as:
+
+* **Improves BW, feed intake, and bird uniformity.**
+
+  * Allows better utilization of nutrients.
+
+  * Reduces nutrient segregation and ensures that a balanced ration is consumed.
+
+  * Reduces feed wastage and bacterial load.
+
+* **Improves feed handling characteristics.**
+
+  * Increases bulk density and improves flowability characteristics.
+
+The goal of the feed industry is to obtain a high pellet quality that satisfies the customer needs and optimizes animal performance.
+
+* **Pellet quality:** quality is the capacity of pellets to withstand repeated handling from the pellet mill to the feeders without excessive breakage or generation of fine particles. Poor pellet quality and the resulting fines negate the advantages of pelleting.
+
+* According to Reimer (1992), the primary factors that influence pellet quality are:
+  * Formulation (40%)
+  * Particle size (20%)
+  * Conditioning (20%)
+  * Die specifications (15%)
+  * Cooling/drying (5%)
+  
+Combined, formulation and particle size determine 60% of the pellet quality even before the mash reaches the conditioner.
+
+**Conditioning is the first step prior to pelleting:** steam addition during conditioning softens feed particles, activates natural binders, and increases die lubrication leading to higher pellet quality and production rate.
+
+The conditioning process should be optimized to obtain pellet quality at a reasonable production rate without deactivating heat-labile nutrients or exogenous enzymes.
+Therefore, the objective of this study is to analyze the effect of conditioning temperature on pellet quality. To address the question of interest, a trial was run to evaluate the impact of 3 conditioning temperatures (75, 80, and 85ºC) on pellet quality by Ph.D. Wilmer Pacheco's Lab of Poultry Sc. Department at Auburn University. 
+
+A corn-soybean meal-based diet with 3.42% soybean oil addition was mixed in a twin-shaft mixer and then steamed, conditioned, and pelleted using a constant production rate of 636 kg/h using a 4.0 mm pellet die. Twenty-four representative pellet samples were collected and immediately cooled 8 random samples were assigned per treatment. **Pellet durability index (PDI)** was analyzed using the tumbler method (ASABE method S269.5) modified with the addition of 5 hex-nuts to simulate pellet breakage during handling and transportation. A tumbler is a metal box that spins over one axis, so when pellets are poured inside the box, the spinning will simulate the physical threats exposed from its production until the arrival of the bird’s feeder. 
+
+![Tumbler](tumbler.jpg){width=25%}
+
+The dataset will be statistically checked to determine if assumptions are met to determine if a parametric analysis or a no-parametric analysis will be needed to test whether the mean (or a median in a no-parametric analysis) PDI differs across conditioning temperatures. 
+
+All statistical analyses will be performed using R (software version 4.1.2).
+
+
+### Hypotheses 
+**Null Hypothesis (H0):** all PDI's Means (or a medians)  under different conditioners temperatures are the same.
+$$ H_0: \mu_1 = \mu_1 = \mu_3 $$
+**Alternative hypothesis (Ha):** At least one PDI's mean (or a median) under different conditioners temperatures is different.
+$$ H_A: Some~ \mu~ is \ne  $$
+
+
+
+## Desing/Methods {.tabset}
+
+The objective of this study was to evaluate the effect of 3 conditioning temperatures (75, 80, and 85ºC) on pellet quality. The data was obtained in Auburn University Alabama Agricultural Experiment Station using 8 pellets samples per treatment. Pellet samples were collected and immediately cooled. 
+
+Conditioning temperature was the only factor that was alter among the treatments, all other factors such as diet composition production rate and mixer fat addition remain constant.  
+
+The data was imported form an excel file to R, where was manipulated to be properly analyzed. The Dataset needed to be of the form response variable in one column and grouping in another column. 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#PACKAGES
+# for data manipulation and visualization for logistic regression
+library(tidyverse)
+# For reading excel files
+library(readxl)
+# For printing large datasets
+library(DT)
+# to create a QQ plot of residuals 
+library(ggpubr)
+#Provides a simple and intuitive pipe-friendly framework, coherent with the 'tidyverse' design philosophy, for performing basic statistical tests
+library(rstatix)
+# Nonparametric Multiple-Comparison Procedure
+library(FSA)
+
+```
+
+```{r echo = FALSE, warning=FALSE, message=FALSE}
+# Reading Dataset
+tumbler <- read_excel("PDI_Tumbler.xlsx")
+# Preparing Data for analysis
+
+# Data will need to be of the form response variable in one column and grouping in another column. 
+tumbler <- tumbler %>%
+  select(Temp, PDI)
+head(tumbler,18)
+```
+
+
+* **Column "Temp":** conditioning temperature treatments (explanatory variable).
+* **Column "PDI":** Pellet Durability Index which is the response variable. Represents the ability to handle 
+pellets without experiencing unacceptable breakage or generating a significant amount of fines. It is expressed in percentage.
+
+
+```{r echo = FALSE, warning=FALSE, message=FALSE}
+# Using the function sample_n_by() to display one random row by groups to inspect the data: 
+
+#Show the levels of the grouping variable:
+
+# set.seed()is an integer vector, containing the random number generator (RNG) state for random number generation in R. It can be saved and restored, but should not be altered by the user.
+
+# For levels to work the feed variable needs to be a factor,
+# if you group variable is not a factor you can change it to
+# be using the as.factor
+set.seed(123456789)
+sample_n_by_tumbler <- tumbler %>% sample_n_by(Temp, size = 1)
+
+tumbler$Temp <- as.factor(as.character(tumbler$Temp))
+factors_tumbler <-levels(tumbler$Temp)
+```
+
+### Summary Statistics {.tabset}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Summary statistics(count, mean, sd) of the variable weight organized by group
+tumbler_sd <- tumbler %>% 
+  group_by(Temp) %>%
+  get_summary_stats(PDI, type = "mean_sd")
+knitr::kable(tumbler_sd , caption = "Descriptive Statistics of Variables")
+```
+
+### Graphical displays of variables
+Pellet durability Index by Treatment
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.show='hold', out.width="90%"}
+# Histograms
+hist <- tumbler %>%
+  ggplot(mapping=aes(x = PDI, fill=Temp)) +
+  geom_histogram(binwidth = 1.5 ) + 
+  labs(title = "Histogram", y="Count", x ="Pellet Durability Index (PDI)") 
+
+
+# Boxplots
+bp <- ggplot(tumbler, aes(y = PDI, x = Temp, fill = Temp)) + 
+  geom_boxplot(outlier.color = "#F56600", 
+               outlier.size = 1.5)+ 
+  labs(title = "Box-plot", y="Pellet Durability Index (PDI)", x = "Temperature") 
+
+
+hist
+bp
+
+
+
+```
+
+**Treatment 1 (75 ºC):** have a mean of 82.338 and a standard deviation of 0.646. It is difficult to determine shape from 8 data points.
+
+**Treatment 2 (80 ºC):** have a mean of 84.020 and a standard deviation of 0.593. It is difficult to determine shape from 8 data points.
+
+**Treatment 3 (85 ºC):** have a mean of 87.135 and a standard deviation of 0.243. It is difficult to determine shape from 8 data points.
+
+**Based on the boxplots**, there are no potential outliers for treatment 1 while treatment 2 has two ourliers above its median, and treatment 3 has one outlier below its median.
+Values seem to be more uniform in treatment number 3, and it seems like temperature might influence directly on pellet quality. However there is not enough information to prove it.
+
+In order to start comparing populations it is necessary to check if the data meets the assumptions to use a parametric or non-parametric statistical approach. If assumptions are met an ANOVA test will be chosen, if the above assumptions are not met there is a non-parametric alternative (Kruskal-Wallis test) to the one-way ANOVA.
+
+## Analysis {.tabset}
+
+### Checking assumptions {.tabset}
+
+#### **Assumption nº1. Random errors are normally distributed.** 
+
+The normality assumption can be checked by using one of the following two approaches:
+
+* Analyzing the ANOVA model residuals to check the normality for all groups together. This approach is easier, and it’s convenient when the dataset has many groups or if there are few data points per group. Check normality assumption by analyzing the model residuals. **QQ plot and Shapiro-Wilk test of normality are used.**
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Build the linear model
+ANOVAmodel <- lm(PDI ~ Temp, data = tumbler)
+#Checking assumpitions:
+#Assumption 1: normality
+# Create a QQ plot of residuals using ggpubr package
+ggqqplot(residuals(ANOVAmodel))+labs(title="QQ plot of residuals")
+# Compute Shapiro-Wilk test of normality
+shapiro_test <- shapiro_test(residuals(ANOVAmodel))
+
+knitr::kable(shapiro_test , caption = "Shapiro-Wilk Test of Normality")
+```
+In the QQ plot, not all points fall along the reference line, showing some evidence of non-normality. The Shapiro-Wilk test supports this conclusion. The p-value is significant(p=0.004), so the evidence suggests the errors are not normally distributed.
+
+* **Checking normality for each group separately**. Computing Shapiro-Wilk test for each group level. If the data is normally distributed, the p-value should be greater than 0.05. Also, a QQ plot for each group level has been created:
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggqqplot(tumbler, "PDI", facet.by = "Temp")+labs(title="QQ plot of residuals by Treatments")
+shapiro_test_grp <- tumbler %>% group_by(Temp) %>% shapiro_test(PDI)
+knitr::kable(shapiro_test_grp, caption = "Shapiro-Wilk Test of Normality")
+```
+
+The p-values for treatments 1 and 3 (75 ºC and 85 ºC) were greater than 0.05; there is not enough evidence to reject the null hypothesis (random errors are normally distributed). However, treatment number 2 (80 ºC) has a p-value smaller than 0.05. Thus, with a 95% confidence, there is evidence to reject H0, indicating that errors are not normally distributed.
+
+Based on the plot, all the points fall approximately along the reference line for each group, except for treatment number 2 (80 ºC), with two outliers. Evidence suggests normality in errors for conditioning temperatures at 75 ºC and 85 ºC, while evidence suggests non-normality in errors for conditioning temperatures at 80 ºC (p-value = 0.0012).
+
+#### **Assumption nº2. Random errors have a mean of 0**
+This is assumed to be true.
+
+#### **Assumption nº3. Random errors are independent**. 
+Since each sample only belongs to one group and there is no relationship between the observations in each group, this assumption is met.
+
+#### **Assumption nº4. Random errors have constant variance**
+The residuals versus fits plot can be used to check the homogeneity of variances. It is also possible to use Levene’s test or Bartlett's test to check the homogeneity of variances. If the variances are not equal Kruskal-Wallis test cannot be performed.
+
+
+```{r echo = FALSE, warning=FALSE, message=FALSE}
+plot(ANOVAmodel, 1)
+bartlett.test(tumbler$PDI~tumbler$Temp)
+tumbler %>% levene_test(PDI~Temp)%>% knitr::kable() 
+```
+
+There is no clear relationship between residuals and fitted values in the plot above. Thus, it can be assumed the errors have a constant variance.
+
+**Levene’s and Bartlett’s test** have a p-value greater than 0.05. This means there is not sufficient evidence to suggest a significant difference between variances across groups. 
+
+### Non-parametric analaysis {.tabset}
+
+#### Kruskal-Wallis test
+
+A non-parametric alternative (Kruskal-Wallis test) to the one-way ANOVA will be used to compare the populations as the first assumption has not been met.
+
+
+```{r echo = FALSE, warning=FALSE, message=FALSE}
+kruskal.test(tumbler$PDI~tumbler$Temp)
+```
+**Report KW Test:** There is sufficient evidence to reject the null Hypothesis (mean ranks of the groups are the same). This means that there was a significant difference in PDI distribution for the 3 Temperature treatments (p-value < 0.001). A post hoc test will now determine where our differences indeed came from. 
+
+##### Post-hoc test - Dunn test for multiple comparison
+
+```{r echo = FALSE, warning=FALSE, message=FALSE}
+dunnTest(PDI~Temp, data = tumbler, "bonferroni")
+```
+
+**Report:** Based on the adjusted p-value, Treatment 1 (75 ºC) has significantly different from Treatment 3 (85 ºC), while the other comparison did not show any significant difference (adjusted p-value > 0.05).
+
+## Summary {.tabset}
+
+This analysis found that **Pellet Quality is influenced by Temperature**. Diets conditioned at 85ºC had a PDI of 87.13%,  higher (P≤0.05)  than diets conditioned at 75 or 80ºC. These results suggest that conditioning temperature directly affects pellet quality of corn-SBM diets when other factors such as production rate and mixer fat addition remain constant.
+
+Further research should be done to evaluate the effect of conditioning temperature on nutrient digestibility and additives stability. PDI data obtained by The Holmen NHP 100 would have enhanced the results of this trial. The Holmen durability is another pellet quality test that uses air to create abrasion of the pellets for a certain period of time, rather than the tumbling action that occurs in the metal box of the Tumbler PDI tester. Therefore, it gives valuable information for those feed mills where compressed air involves transportation and handling. Also, it would be interesting to predict pellet quality with the knowledge of both methodologies by creating a multiple linear regression model as temperature and time are involved in the Holmen test. 
+
+These findings should help nutritionists and feed mill managers obtain the best pellet quality keeping a reasonable production rate and maintaining its nutritional content because high temperatures can deactivate heat-labile nutrients and exogenous enzymes or even facilitate the formation of indigestible compounds. 
+
+Each feed mill should develop a testing model that estimates the percentage of fines at the feed mill, in the bag or delivery truck, and the feeder on the farm. A well-designed pellet durability model provides continuous feedback on the effects of formulation and processing variables on pellet quality. Most importantly, the pellet durability results should be used as a tool to improve the quality of the feed delivered to the customer.
+
+
+## References {.tabset}
+
+Feed manufacturing technology V (2005). (Fifth ed.) AFI.
+Notes and Box files from STATS-6020
+<https://bookstore.ksre.ksu.edu/pubs/MF3228.pdf>
+<https://www.youtube.com/watch?v=Y1qeAFAV5yQ>
+<https://www.analytics-toolkit.com/glossary/p-value-adjustment/>
+
+## Personal Information {.tabset}
+
+### Santiago Sasia 
+
+He is a Graduate Student at Clemson University perusing his master’s degree in Monogastric Nutrition. He has got his degree in Veterinarian Medicine in Argentina at Litoral University and last year he did an Internship in Auburn University where he worked in the Poultry Sc. Department. 
+
+In the last years, Santiago began to be interested in the way in which data and digitalization are revolutionizing the way of addressing problems and is very excited to continue perfecting all the tools that are at his disposal to have a more analytical perspective over his field of reach.
+
+
+
+```{r  echo=FALSE, out.width="25%", fig.align='center', warning=FALSE}
+
+knitr::include_graphics("pic_me.jpg")
+```
+
+
+## Appendix {.tabset}
+
+```{r echo=TRUE, results='hide', eval=FALSE, warning=FALSE, message=FALSE, collapse=TRUE}
+#PACKAGES
+  # For data manipulation and visualization for logistic regression
+library(tidyverse)
+  # For reading excel files
+library(readxl)
+  # For printing large datasets
+library(DT)
+  # To create a QQ plot of residuals 
+library(ggpubr)
+  #Provides a simple and intuitive pipe-friendly framework, coherent with the 'tidyverse' design philosophy, for performing basic statistical tests
+library(rstatix)
+  # Nonparametric Multiple-Comparison Procedure
+library(FSA)
+
+
+# READIND DATASET
+tumbler <- read_excel("PDI_Tumbler.xlsx")
+  # Preparing Data for analysis
+  # Data will need to be of the form response variable in one column and grouping in another column. 
+tumbler <- tumbler %>%
+  select(Temp, PDI)
+head(tumbler,18)
+
+# Using the function sample_n_by() to display one random row by groups to inspect the data: 
+  #Show the levels of the grouping variable:
+      # set.seed()is an integer vector containing the random number generator (RNG) state for random number generation in R. It can be saved and restored, but the user should not alter it.
+set.seed(123456789)
+sample_n_by_tumbler <- tumbler %>% sample_n_by(Temp, size = 1)
+      # For levels to work the "Temp" variable needs to be a factor,
+      # If your group variable is not a factor you can change it to, using the as.factor
+tumbler$Temp <- as.factor(as.character(tumbler$Temp))
+factors_tumbler <-levels(tumbler$Temp)
+
+# Summary statistics
+    #(count, mean, sd) of the variable PDI organized by group
+tumbler_sd <- tumbler %>% 
+  group_by(Temp) %>%
+  get_summary_stats(PDI, type = "mean_sd")
+knitr::kable(tumbler_sd , caption = "Descriptive Statistics of Variables")
+
+#VISUALIZATION
+# Histograms
+hist <- tumbler %>%
+  ggplot(mapping=aes(x = PDI, fill=Temp)) +
+  geom_histogram(binwidth = 1.5 ) + 
+  labs(title = "Histogram", y="Count", x ="Pellet Durability Index (PDI)") 
+# Boxplots
+bp <- ggplot(tumbler, aes(y = PDI, x = Temp, fill = Temp)) + 
+  geom_boxplot(outlier.color = "#F56600", 
+               outlier.size = 1.5)+ 
+  labs(title = "Box-plot", y="Pellet Durability Index (PDI)", x = "Temperature") 
+hist
+bp
+
+# Build the linear model
+ANOVAmodel <- lm(PDI ~ Temp, data = tumbler)
+#Checking assumptions:
+#Assumption 1: normality
+# Create a QQ plot of residuals using ggpubr package
+ggqqplot(residuals(ANOVAmodel))+labs(title="QQ plot of residuals")
+# Compute Shapiro-Wilk test of normality
+shapiro_test <- shapiro_test(residuals(ANOVAmodel))
+knitr::kable(shapiro_test , caption = "Shapiro-Wilk Test of Normality")
+
+#Checking normality for each group separately
+ggqqplot(tumbler, "PDI", facet.by = "Temp")+labs(title="QQ plot of residuals by Treatments")
+shapiro_test_grp <- tumbler %>% group_by(Temp) %>% shapiro_test(PDI)
+knitr::kable(shapiro_test_grp, caption = "Shapiro-Wilk Test of Normality")
+
+#Checking the homogeneity of variances
+plot(ANOVAmodel, 1)
+# Bartlett test
+bartlett.test(tumbler$PDI~tumbler$Temp)
+# Levene test
+tumbler %>% levene_test(PDI~Temp)%>% knitr::kable()
+# A non-parametric alternative (Kruskal-Wallis test) to compare the populations as the first assumption has not been met.
+# Kruskal-Wallis test
+kruskal.test(tumbler$PDI~tumbler$Temp)
+
+#A post hoc test will determine where our differences came from. 
+# Post-hoc test - Dunn test for multiple comparisons
+dunnTest(PDI~Temp, data = tumbler, "bonferroni")
+
+```
+
+
+
+## Acknowledgment {.tabset}
+
+* Auburn University Alabama Agricultural Experiment Station. 
+* Auburn University Poultry Science Department.
+* Dr. Pacheco´s Lab members.
+* Prof. Ellen Breazel, Teacher in STAT-6020 Intro to Statistical Computing - Spring 2022 at Clemson University.
+
+```{r  echo=FALSE,  out.width="15%", fig.align='center',fig.show='hold', warning=FALSE}
+
+knitr::include_graphics("82-823355_auburn-tigers-football.png")
+knitr::include_graphics("tppo.jpg")
+```
